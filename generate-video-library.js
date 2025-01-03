@@ -2,17 +2,21 @@ require('dotenv').config();
 const fs = require('fs');
 const Mux = require('@mux/mux-node');
 
-const mux = new Mux({
+const { Video } = new Mux({
   tokenId: process.env.MUX_TOKEN_ID,
   tokenSecret: process.env.MUX_TOKEN_SECRET
 });
 
 async function generateVideoLibrary() {
   try {
+    console.log('Fetching videos from Mux...');
+    
     // Fetch videos from Mux
-    const { data: assets } = await mux.video.assets.list({
+    const { data: assets } = await Video.Assets.list({
       limit: 100
     });
+
+    console.log(`Found ${assets.length} videos`);
 
     // Generate the markdown content
     let markdownContent = `---
@@ -51,12 +55,14 @@ title: Video Library
 `;
 
     // Add each video to the markdown
+    let videoCount = 0;
     assets.forEach(asset => {
       if (asset.status === 'ready' && asset.playback_ids?.[0]?.id) {
         const title = asset.title || 'Untitled Video';
         const playbackId = asset.playback_ids[0].id;
         
-        console.log(`Adding video: ${title} (${playbackId})`); // Debug log
+        console.log(`Adding video: ${title} (${playbackId})`);
+        videoCount++;
         
         markdownContent += `
   <div class="video-card">
@@ -78,11 +84,11 @@ title: Video Library
 
     // Write to file
     fs.writeFileSync('index.md', markdownContent);
-    console.log('Video library markdown generated successfully!');
-    console.log(`Total videos added: ${assets.filter(a => a.status === 'ready' && a.playback_ids?.[0]?.id).length}`);
+    console.log(`Video library generated successfully with ${videoCount} videos!`);
 
   } catch (error) {
     console.error('Error generating video library:', error);
+    throw error; // This will make the GitHub Action fail if there's an error
   }
 }
 
