@@ -12,7 +12,6 @@ async function generateVideoLibrary() {
         console.log('Fetching videos from Mux...');
         const assets = await muxClient.get('/video/v1/assets');
         
-        // Group videos by category
         const videosByCategory = {};
         
         assets.data.forEach(asset => {
@@ -37,7 +36,9 @@ async function generateVideoLibrary() {
                     id: asset.id,
                     playbackId: asset.playback_ids[0].id,
                     title: title,
-                    category: category
+                    category: category,
+                    duration: asset.duration,
+                    createdAt: asset.created_at
                 });
             }
         });
@@ -74,6 +75,7 @@ function generateMarkdown(videosByCategory) {
         '    display: flex;',
         '    gap: 1rem;',
         '    flex-wrap: wrap;',
+        '    align-items: center;',
         '}',
         '.search-box {',
         '    padding: 0.5rem;',
@@ -81,11 +83,36 @@ function generateMarkdown(videosByCategory) {
         '    border-radius: 0.5rem;',
         '    min-width: 250px;',
         '}',
+        '.sort-select {',
+        '    padding: 0.5rem;',
+        '    border: 1px solid var(--video-card-border);',
+        '    border-radius: 0.5rem;',
+        '    background: var(--video-card-background);',
+        '}',
+        '.view-toggle {',
+        '    padding: 0.5rem 1rem;',
+        '    border: 1px solid var(--video-card-border);',
+        '    border-radius: 0.5rem;',
+        '    background: var(--video-card-background);',
+        '    cursor: pointer;',
+        '}',
         '.video-grid {',
         '    display: grid;',
         '    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));',
         '    gap: 2rem;',
         '    padding: 1rem;',
+        '}',
+        '.list-view {',
+        '    grid-template-columns: 1fr;',
+        '    max-width: 800px;',
+        '    margin: 0 auto;',
+        '}',
+        '.list-view .video-card {',
+        '    display: flex;',
+        '    gap: 1rem;',
+        '}',
+        '.list-view mux-player {',
+        '    width: 200px;',
         '}',
         '.video-card {',
         '    border: 1px solid var(--video-card-border);',
@@ -106,16 +133,32 @@ function generateMarkdown(videosByCategory) {
         '    font-size: 0.9rem;',
         '    color: var(--text-secondary);',
         '}',
-        '.filter-button {',
-        '    padding: 0.5rem 1rem;',
-        '    border: 1px solid var(--video-card-border);',
-        '    border-radius: 0.5rem;',
-        '    background: var(--video-card-background);',
-        '    cursor: pointer;',
+        '.video-duration {',
+        '    font-size: 0.8rem;',
+        '    color: var(--text-secondary);',
+        '    margin-top: 0.5rem;',
         '}',
-        '.filter-button.active {',
-        '    background: var(--accent-color);',
-        '    color: white;',
+        '.category-tag {',
+        '    display: inline-block;',
+        '    padding: 0.25rem 0.5rem;',
+        '    border-radius: 1rem;',
+        '    font-size: 0.8rem;',
+        '    margin-top: 0.5rem;',
+        '}',
+        '.loading {',
+        '    text-align: center;',
+        '    padding: 2rem;',
+        '}',
+        '.loading::after {',
+        '    content: "Loading...";',
+        '    display: inline-block;',
+        '    animation: ellipsis 1.4s infinite;',
+        '}',
+        '@keyframes ellipsis {',
+        '    0% { content: "Loading"; }',
+        '    33% { content: "Loading."; }',
+        '    66% { content: "Loading.."; }',
+        '    100% { content: "Loading..."; }',
         '}',
         '@media (max-width: 768px) {',
         '    .controls {',
@@ -129,22 +172,33 @@ function generateMarkdown(videosByCategory) {
         '',
         '<div class="controls">',
         '    <input type="text" class="search-box" placeholder="Search videos..." onkeyup="searchVideos(this.value)">',
+        '    <select class="sort-select" onchange="sortVideos(this.value)">',
+        '        <option value="newest">Newest First</option>',
+        '        <option value="oldest">Oldest First</option>',
+        '        <option value="title">Alphabetical</option>',
+        '    </select>',
+        '    <button class="view-toggle" onclick="toggleView()">',
+        '        <span class="grid-icon">⊞</span>',
+        '        <span class="list-icon">☰</span>',
+        '    </button>',
         '    <div class="filter-buttons">',
         '        <button class="filter-button active" onclick="filterVideos(\'all\')">All</button>'
     ];
 
-    // Add category filter buttons
     Object.keys(videosByCategory).forEach(category => {
         lines.push(`        <button class="filter-button" onclick="filterVideos('${category}')">${category}</button>`);
     });
 
     lines.push('    </div>', '</div>', '', '<div class="video-grid">');
 
-    // Add videos
     Object.entries(videosByCategory).forEach(([category, videos]) => {
         videos.forEach(video => {
+            const categoryColor = getCategoryColor(category);
             lines.push(`
-    <div class="video-card" data-category="${category}">
+    <div class="video-card" 
+         data-category="${category}" 
+         data-created="${video.createdAt}" 
+         data-title="${video.title}">
         <mux-player
             stream-type="vod"
             playback-id="${video.playbackId}"
@@ -153,7 +207,12 @@ function generateMarkdown(videosByCategory) {
         </mux-player>
         <div class="video-info">
             <div class="video-title">${video.title}</div>
-            <div class="video-meta">Category: ${category}</div>
+            <div class="video-meta">
+                <span class="category-tag" style="background-color: ${categoryColor}">
+                    ${category}
+                </span>
+                <div class="video-duration">${formatDuration(video.duration)}</div>
+            </div>
         </div>
     </div>`);
         });
@@ -161,7 +220,6 @@ function generateMarkdown(videosByCategory) {
 
     lines.push('</div>');
 
-    // Add JavaScript functions
     lines.push(`
 <script>
 function searchVideos(query) {
@@ -178,13 +236,11 @@ function searchVideos(query) {
 }
 
 function filterVideos(category) {
-    // Update active button
     document.querySelectorAll('.filter-button').forEach(button => {
         button.classList.toggle('active', 
             button.textContent.toLowerCase() === category.toLowerCase());
     });
 
-    // Filter videos
     document.querySelectorAll('.video-card').forEach(card => {
         if (category === 'all' || card.dataset.category === category) {
             card.style.display = 'block';
@@ -192,6 +248,46 @@ function filterVideos(category) {
             card.style.display = 'none';
         }
     });
+}
+
+function sortVideos(criteria) {
+    const grid = document.querySelector('.video-grid');
+    const cards = Array.from(grid.children);
+    
+    cards.sort((a, b) => {
+        switch(criteria) {
+            case 'newest':
+                return b.dataset.created - a.dataset.created;
+            case 'oldest':
+                return a.dataset.created - b.dataset.created;
+            case 'title':
+                return a.dataset.title.localeCompare(b.dataset.title);
+        }
+    });
+    
+    cards.forEach(card => grid.appendChild(card));
+}
+
+function toggleView() {
+    const grid = document.querySelector('.video-grid');
+    grid.classList.toggle('list-view');
+}
+
+function formatDuration(seconds) {
+    if (!seconds) return 'Unknown';
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return \`\${minutes}:\${remainingSeconds.toString().padStart(2, '0')}\`;
+}
+
+function getCategoryColor(category) {
+    const colors = [
+        '#e9d5ff', '#bfdbfe', '#bbf7d0', '#fed7aa', 
+        '#fecaca', '#e9d5ff', '#ddd6fe', '#c7d2fe'
+    ];
+    const index = Math.abs(category.split('').reduce((acc, char) => 
+        acc + char.charCodeAt(0), 0)) % colors.length;
+    return colors[index];
 }
 </script>`);
 
