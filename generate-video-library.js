@@ -2,7 +2,19 @@ require('dotenv').config();
 const Mux = require('@mux/mux-node');
 const fs = require('fs');
 
-// Helper functions moved to the top
+// Helper functions
+function formatDuration(seconds) {
+    if (!seconds) return 'Unknown';
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    
+    if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
 function getCategoryColor(category) {
     const colors = [
         '#e9d5ff', '#bfdbfe', '#bbf7d0', '#fed7aa', 
@@ -11,13 +23,6 @@ function getCategoryColor(category) {
     const index = Math.abs(category.split('').reduce((acc, char) => 
         acc + char.charCodeAt(0), 0)) % colors.length;
     return colors[index];
-}
-
-function formatDuration(seconds) {
-    if (!seconds) return 'Unknown';
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
 const muxClient = new Mux.default({
@@ -70,7 +75,6 @@ async function generateVideoLibrary() {
         throw error;
     }
 }
-
 function generateMarkdown(videosByCategory) {
     const lines = [
         '---',
@@ -106,6 +110,20 @@ function generateMarkdown(videosByCategory) {
         '    border: 1px solid var(--video-card-border);',
         '    border-radius: 0.5rem;',
         '    background: var(--video-card-background);',
+        '}',
+        '.filter-button {',
+        '    padding: 0.5rem 1rem;',
+        '    border: 1px solid var(--video-card-border);',
+        '    border-radius: 0.5rem;',
+        '    cursor: pointer;',
+        '    transition: opacity 0.2s;',
+        '}',
+        '.filter-button:not(.active) {',
+        '    opacity: 0.7;',
+        '}',
+        '.filter-button.active {',
+        '    opacity: 1;',
+        '    border: 2px solid var(--accent-color);',
         '}',
         '.view-toggle {',
         '    padding: 0.5rem 1rem;',
@@ -163,21 +181,6 @@ function generateMarkdown(videosByCategory) {
         '    font-size: 0.8rem;',
         '    margin-top: 0.5rem;',
         '}',
-        '.loading {',
-        '    text-align: center;',
-        '    padding: 2rem;',
-        '}',
-        '.loading::after {',
-        '    content: "Loading...";',
-        '    display: inline-block;',
-        '    animation: ellipsis 1.4s infinite;',
-        '}',
-        '@keyframes ellipsis {',
-        '    0% { content: "Loading"; }',
-        '    33% { content: "Loading."; }',
-        '    66% { content: "Loading.."; }',
-        '    100% { content: "Loading..."; }',
-        '}',
         '@media (max-width: 768px) {',
         '    .controls {',
         '        flex-direction: column;',
@@ -203,19 +206,22 @@ function generateMarkdown(videosByCategory) {
         '        <button class="filter-button active" onclick="filterVideos(\'all\')">All</button>'
     ];
 
+    // Add category filter buttons with matching colors
     Object.keys(videosByCategory).forEach(category => {
-        lines.push(`        <button class="filter-button" onclick="filterVideos('${category}')">${category}</button>`);
+        const categoryColor = getCategoryColor(category);
+        lines.push(`        <button class="filter-button" onclick="filterVideos('${category}')" style="background-color: ${categoryColor}">${category}</button>`);
     });
 
     lines.push('    </div>', '</div>', '', '<div class="video-grid">');
 
+    // Add videos with proper data attributes
     Object.entries(videosByCategory).forEach(([category, videos]) => {
         videos.forEach(video => {
             const categoryColor = getCategoryColor(category);
             lines.push(`
     <div class="video-card" 
          data-category="${category}" 
-         data-created="${video.createdAt}" 
+         data-created="${new Date(video.createdAt).toISOString()}" 
          data-title="${video.title}">
         <mux-player
             stream-type="vod"
@@ -238,6 +244,7 @@ function generateMarkdown(videosByCategory) {
 
     lines.push('</div>');
 
+    // Add JavaScript functions
     lines.push(`
 <script>
 function searchVideos(query) {
@@ -270,42 +277,33 @@ function filterVideos(category) {
 
 function sortVideos(criteria) {
     const grid = document.querySelector('.video-grid');
-    const cards = Array.from(grid.children);
+    const cards = Array.from(document.querySelectorAll('.video-card'));
     
     cards.sort((a, b) => {
         switch(criteria) {
             case 'newest':
-                return b.dataset.created - a.dataset.created;
+                return new Date(b.dataset.created) - new Date(a.dataset.created);
             case 'oldest':
-                return a.dataset.created - b.dataset.created;
+                return new Date(a.dataset.created) - new Date(b.dataset.created);
             case 'title':
                 return a.dataset.title.localeCompare(b.dataset.title);
+            default:
+                return 0;
         }
     });
     
-    cards.forEach(card => grid.appendChild(card));
+    // Clear the grid and re-add sorted cards
+    grid.innerHTML = '';
+    cards.forEach(card => {
+        if (card.style.display !== 'none') {
+            grid.appendChild(card);
+        }
+    });
 }
 
 function toggleView() {
     const grid = document.querySelector('.video-grid');
     grid.classList.toggle('list-view');
-}
-
-function formatDuration(seconds) {
-    if (!seconds) return 'Unknown';
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return \`\${minutes}:\${remainingSeconds.toString().padStart(2, '0')}\`;
-}
-
-function getCategoryColor(category) {
-    const colors = [
-        '#e9d5ff', '#bfdbfe', '#bbf7d0', '#fed7aa', 
-        '#fecaca', '#e9d5ff', '#ddd6fe', '#c7d2fe'
-    ];
-    const index = Math.abs(category.split('').reduce((acc, char) => 
-        acc + char.charCodeAt(0), 0)) % colors.length;
-    return colors[index];
 }
 </script>`);
 
