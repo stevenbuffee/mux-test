@@ -290,8 +290,10 @@ function sortVideos(criteria) {
         }
     });
     
-    // Clear the grid and re-add sorted cards
-    grid.innerHTML = '';
+    // Remove all cards (but don't destroy them)
+    cards.forEach(card => card.remove());
+    
+    // Re-add the sorted cards
     cards.forEach(card => {
         if (card.style.display !== 'none') {
             grid.appendChild(card);
