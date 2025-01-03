@@ -2,7 +2,6 @@ require('dotenv').config();
 const Mux = require('@mux/mux-node');
 const fs = require('fs');
 
-// Helper functions
 function formatDuration(seconds) {
     if (!seconds) return 'Unknown';
     const hours = Math.floor(seconds / 3600);
@@ -61,7 +60,7 @@ async function generateVideoLibrary() {
                     title: title,
                     category: category,
                     duration: asset.duration,
-                    createdAt: new Date(asset.created_at).getTime() // Convert to timestamp
+                    createdAt: new Date(asset.created_at).getTime()
                 });
             }
         });
@@ -84,6 +83,13 @@ function generateMarkdown(videosByCategory) {
         '# Video Library',
         '',
         '<script src="https://cdn.jsdelivr.net/npm/@mux/mux-player"></script>',
+        '',
+        // Add Queue Sidebar
+        '<div class="queue-sidebar" id="queueSidebar">',
+        '    <h3>Queue</h3>',
+        '    <div class="queue-list" id="queueList"></div>',
+        '    <button onclick="document.getElementById(\'queueSidebar\').classList.remove(\'open\')" class="close-queue">Close</button>',
+        '</div>',
         '',
         '<style>',
         ':root {',
@@ -126,30 +132,50 @@ function generateMarkdown(videosByCategory) {
         '    opacity: 1;',
         '    border: 2px solid var(--accent-color);',
         '}',
-        '.view-toggle {',
-        '    padding: 0.5rem 1rem;',
-        '    border: 1px solid var(--video-card-border);',
-        '    border-radius: 0.5rem;',
+        '.queue-sidebar {',
+        '    position: fixed;',
+        '    right: -300px;',
+        '    top: 0;',
+        '    width: 300px;',
+        '    height: 100%;',
         '    background: var(--video-card-background);',
+        '    border-left: 1px solid var(--video-card-border);',
+        '    transition: right 0.3s ease;',
+        '    padding: 1rem;',
+        '    z-index: 1000;',
+        '}',
+        '.queue-sidebar.open {',
+        '    right: 0;',
+        '}',
+        '.close-queue {',
+        '    position: absolute;',
+        '    top: 1rem;',
+        '    right: 1rem;',
+        '    padding: 0.5rem;',
         '    cursor: pointer;',
+        '}',
+        '.queue-item {',
+        '    padding: 0.5rem;',
+        '    border-bottom: 1px solid var(--video-card-border);',
+        '    display: flex;',
+        '    justify-content: space-between;',
+        '    align-items: center;',
         '}',
         '.video-grid {',
         '    display: grid;',
         '    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));',
         '    gap: 2rem;',
         '    padding: 1rem;',
+        '    transition: all 0.3s ease;',
         '}',
-        '.list-view {',
-        '    grid-template-columns: 1fr;',
-        '    max-width: 800px;',
-        '    margin: 0 auto;',
+        '.video-grid.size-small {',
+        '    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));',
         '}',
-        '.list-view .video-card {',
-        '    display: flex;',
-        '    gap: 1rem;',
+        '.video-grid.size-medium {',
+        '    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));',
         '}',
-        '.list-view mux-player {',
-        '    width: 200px;',
+        '.video-grid.size-large {',
+        '    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));',
         '}',
         '.video-card {',
         '    border: 1px solid var(--video-card-border);',
@@ -166,43 +192,42 @@ function generateMarkdown(videosByCategory) {
         '    margin-bottom: 0.5rem;',
         '    color: var(--text-primary);',
         '}',
-        '.video-meta {',
-        '    font-size: 0.9rem;',
-        '    color: var(--text-secondary);',
-        '}',
-        '.video-duration {',
-        '    font-size: 0.8rem;',
-        '    color: var(--text-secondary);',
+        '.video-actions {',
+        '    display: flex;',
+        '    gap: 0.5rem;',
         '    margin-top: 0.5rem;',
         '}',
-        '.category-tag {',
-        '    display: inline-block;',
+        '.video-actions button {',
         '    padding: 0.25rem 0.5rem;',
-        '    border-radius: 1rem;',
-        '    font-size: 0.8rem;',
-        '    margin-top: 0.5rem;',
+        '    border: 1px solid var(--video-card-border);',
+        '    border-radius: 0.25rem;',
+        '    background: var(--video-card-background);',
+        '    cursor: pointer;',
         '}',
-        '@media (max-width: 768px) {',
-        '    .controls {',
-        '        flex-direction: column;',
-        '    }',
-        '    .search-box {',
-        '        width: 100%;',
-        '    }',
+        '.grid-controls {',
+        '    display: flex;',
+        '    gap: 0.5rem;',
+        '}',
+        '.grid-controls button {',
+        '    padding: 0.5rem 1rem;',
+        '    border: 1px solid var(--video-card-border);',
+        '    border-radius: 0.5rem;',
+        '    cursor: pointer;',
         '}',
         '</style>',
         '',
         '<div class="controls">',
         '    <input type="text" class="search-box" placeholder="Search videos..." onkeyup="searchVideos(this.value)">',
+        '    <div class="grid-controls">',
+        '        <button onclick="setGridSize(\'small\')">Small</button>',
+        '        <button onclick="setGridSize(\'medium\')">Medium</button>',
+        '        <button onclick="setGridSize(\'large\')">Large</button>',
+        '    </div>',
         '    <select class="sort-select" onchange="sortVideos(this.value)">',
         '        <option value="newest">Newest First</option>',
         '        <option value="oldest">Oldest First</option>',
         '        <option value="title">Alphabetical</option>',
         '    </select>',
-        '    <button class="view-toggle" onclick="toggleView()">',
-        '        <span class="grid-icon">⊞</span>',
-        '        <span class="list-icon">☰</span>',
-        '    </button>',
         '    <div class="filter-buttons">',
         '        <button class="filter-button active" onclick="filterVideos(\'all\')">All</button>'
     ];
@@ -223,13 +248,17 @@ function generateMarkdown(videosByCategory) {
          data-created="${video.createdAt}" 
          data-title="${video.title}">
         <mux-player
-           stream-type="on-demand"
+            stream-type="on-demand"
             playback-id="${video.playbackId}"
             metadata-video-title="${video.title}"
             controls>
         </mux-player>
         <div class="video-info">
             <div class="video-title">${video.title}</div>
+            <div class="video-actions">
+                <button onclick="addToQueue('${video.playbackId}', '${video.title}')">Add to Queue</button>
+                <button onclick="shareVideo('${video.playbackId}', '${video.title}')">Share</button>
+            </div>
             <div class="video-meta">
                 <span class="category-tag" style="background-color: ${categoryColor}">
                     ${category}
@@ -245,6 +274,50 @@ function generateMarkdown(videosByCategory) {
 
     lines.push(`
 <script>
+const videoQueue = [];
+
+function addToQueue(playbackId, title) {
+    videoQueue.push({ playbackId, title });
+    updateQueueDisplay();
+    document.getElementById('queueSidebar').classList.add('open');
+}
+
+function removeFromQueue(index) {
+    videoQueue.splice(index, 1);
+    updateQueueDisplay();
+}
+
+function updateQueueDisplay() {
+    const queueList = document.getElementById('queueList');
+    queueList.innerHTML = videoQueue.map((video, index) => \`
+        <div class="queue-item">
+            <span>\${video.title}</span>
+            <button onclick="removeFromQueue(\${index})">Remove</button>
+        </div>
+    \`).join('');
+}
+
+function setGridSize(size) {
+    const grid = document.querySelector('.video-grid');
+    grid.classList.remove('size-small', 'size-medium', 'size-large');
+    grid.classList.add(\`size-\${size}\`);
+    localStorage.setItem('gridSize', size);
+}
+
+function shareVideo(playbackId, title) {
+    const url = \`\${window.location.origin}\${window.location.pathname}?video=\${playbackId}\`;
+    if (navigator.share) {
+        navigator.share({
+            title: title,
+            text: \`Check out this video: \${title}\`,
+            url: url
+        });
+    } else {
+        navigator.clipboard.writeText(url)
+            .then(() => alert('Link copied to clipboard!'));
+    }
+}
+
 function searchVideos(query) {
     query = query.toLowerCase();
     document.querySelectorAll('.video-card').forEach(card => {
@@ -275,12 +348,8 @@ function filterVideos(category) {
 
 function sortVideos(criteria) {
     const grid = document.querySelector('.video-grid');
-    const cards = Array.from(grid.children);
+    const cards = Array.from(document.querySelectorAll('.video-card'));
     
-    // Create a temporary container
-    const temp = document.createDocumentFragment();
-    
-    // Sort the cards
     cards.sort((a, b) => {
         switch(criteria) {
             case 'newest':
@@ -294,19 +363,19 @@ function sortVideos(criteria) {
         }
     });
     
-    // Move cards to the temporary container and back
+    const temp = document.createDocumentFragment();
     cards.forEach(card => {
         if (card.style.display !== 'none') {
             temp.appendChild(card);
         }
     });
-    
     grid.appendChild(temp);
 }
 
-function toggleView() {
-    const grid = document.querySelector('.video-grid');
-    grid.classList.toggle('list-view');
+// Initialize grid size from localStorage
+const savedSize = localStorage.getItem('gridSize');
+if (savedSize) {
+    setGridSize(savedSize);
 }
 </script>`);
 
