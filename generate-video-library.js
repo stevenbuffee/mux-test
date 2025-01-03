@@ -2,8 +2,8 @@ require('dotenv').config();
 const Mux = require('@mux/mux-node');
 const fs = require('fs');
 
-// Initialize Mux client with Video namespace
-const { Video } = new Mux({
+// Initialize Mux client
+const muxClient = new Mux.default({
     tokenId: process.env.MUX_TOKEN_ID,
     tokenSecret: process.env.MUX_TOKEN_SECRET
 });
@@ -14,16 +14,19 @@ async function generateVideoLibrary() {
         console.log('Token ID:', process.env.MUX_TOKEN_ID ? 'Present' : 'Missing');
         console.log('Token Secret:', process.env.MUX_TOKEN_SECRET ? 'Present' : 'Missing');
 
-        const { data: assets } = await Video.Assets.list({
-            limit: 100
+        // Debug the muxClient object
+        console.log('Mux Client Structure:', {
+            hasVideo: !!muxClient.Video,
+            properties: Object.keys(muxClient)
         });
 
-        // Debug output
-        console.log(`Found ${assets.length} videos`);
-        
-        const videos = assets.map(asset => ({
+        // Use the Video API client directly
+        const assets = await muxClient.get('/video/v1/assets');
+        console.log('Raw API Response:', assets);
+
+        const videos = assets.data.map(asset => ({
             id: asset.id,
-            playbackId: asset.playback_ids[0]?.id,
+            playbackId: asset.playback_ids?.[0]?.id,
             status: asset.status,
             duration: asset.duration,
             aspectRatio: asset.aspect_ratio,
@@ -31,6 +34,7 @@ async function generateVideoLibrary() {
         }));
 
         // Debug output
+        console.log(`Found ${videos.length} videos`);
         console.log('Video data:', JSON.stringify(videos, null, 2));
 
         const markdownContent = generateMarkdown(videos);
@@ -38,6 +42,13 @@ async function generateVideoLibrary() {
         console.log('Video library generated successfully!');
     } catch (error) {
         console.error('Error generating video library:', error);
+        // Log more details about the error
+        console.error('Error details:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+            muxClientKeys: muxClient ? Object.keys(muxClient) : 'undefined'
+        });
         throw error;
     }
 }
