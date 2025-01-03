@@ -275,8 +275,12 @@ function filterVideos(category) {
 
 function sortVideos(criteria) {
     const grid = document.querySelector('.video-grid');
-    const cards = Array.from(document.querySelectorAll('.video-card'));
+    const cards = Array.from(grid.children);
     
+    // Create a temporary container
+    const temp = document.createDocumentFragment();
+    
+    // Sort the cards
     cards.sort((a, b) => {
         switch(criteria) {
             case 'newest':
@@ -290,15 +294,14 @@ function sortVideos(criteria) {
         }
     });
     
-    // Remove all cards (but don't destroy them)
-    cards.forEach(card => card.remove());
-    
-    // Re-add the sorted cards
+    // Move cards to the temporary container and back
     cards.forEach(card => {
         if (card.style.display !== 'none') {
-            grid.appendChild(card);
+            temp.appendChild(card);
         }
     });
+    
+    grid.appendChild(temp);
 }
 
 function toggleView() {
