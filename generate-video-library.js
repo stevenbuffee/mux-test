@@ -52,9 +52,11 @@ title: Video Library
 
     // Add each video to the markdown
     assets.forEach(asset => {
-      if (asset.status === 'ready' && asset.playback_ids?.[0]) {
+      if (asset.status === 'ready' && asset.playback_ids?.[0]?.id) {
         const title = asset.title || 'Untitled Video';
         const playbackId = asset.playback_ids[0].id;
+        
+        console.log(`Adding video: ${title} (${playbackId})`); // Debug log
         
         markdownContent += `
   <div class="video-card">
@@ -77,6 +79,7 @@ title: Video Library
     // Write to file
     fs.writeFileSync('index.md', markdownContent);
     console.log('Video library markdown generated successfully!');
+    console.log(`Total videos added: ${assets.filter(a => a.status === 'ready' && a.playback_ids?.[0]?.id).length}`);
 
   } catch (error) {
     console.error('Error generating video library:', error);
