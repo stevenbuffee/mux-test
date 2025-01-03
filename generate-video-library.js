@@ -61,7 +61,7 @@ async function generateVideoLibrary() {
                     title: title,
                     category: category,
                     duration: asset.duration,
-                    createdAt: asset.created_at
+                    createdAt: new Date(asset.created_at).getTime() // Convert to timestamp
                 });
             }
         });
@@ -75,6 +75,7 @@ async function generateVideoLibrary() {
         throw error;
     }
 }
+
 function generateMarkdown(videosByCategory) {
     const lines = [
         '---',
@@ -206,7 +207,6 @@ function generateMarkdown(videosByCategory) {
         '        <button class="filter-button active" onclick="filterVideos(\'all\')">All</button>'
     ];
 
-    // Add category filter buttons with matching colors
     Object.keys(videosByCategory).forEach(category => {
         const categoryColor = getCategoryColor(category);
         lines.push(`        <button class="filter-button" onclick="filterVideos('${category}')" style="background-color: ${categoryColor}">${category}</button>`);
@@ -214,14 +214,13 @@ function generateMarkdown(videosByCategory) {
 
     lines.push('    </div>', '</div>', '', '<div class="video-grid">');
 
-    // Add videos with proper data attributes
     Object.entries(videosByCategory).forEach(([category, videos]) => {
         videos.forEach(video => {
             const categoryColor = getCategoryColor(category);
             lines.push(`
     <div class="video-card" 
          data-category="${category}" 
-         data-created="${new Date(video.createdAt).toISOString()}" 
+         data-created="${video.createdAt}" 
          data-title="${video.title}">
         <mux-player
             stream-type="vod"
@@ -244,7 +243,6 @@ function generateMarkdown(videosByCategory) {
 
     lines.push('</div>');
 
-    // Add JavaScript functions
     lines.push(`
 <script>
 function searchVideos(query) {
@@ -282,9 +280,9 @@ function sortVideos(criteria) {
     cards.sort((a, b) => {
         switch(criteria) {
             case 'newest':
-                return new Date(b.dataset.created) - new Date(a.dataset.created);
+                return Number(b.dataset.created) - Number(a.dataset.created);
             case 'oldest':
-                return new Date(a.dataset.created) - new Date(b.dataset.created);
+                return Number(a.dataset.created) - Number(b.dataset.created);
             case 'title':
                 return a.dataset.title.localeCompare(b.dataset.title);
             default:
