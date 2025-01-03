@@ -2,7 +2,7 @@ require('dotenv').config();
 const Mux = require('@mux/mux-node');
 const fs = require('fs');
 
-// Initialize the Mux client properly
+// Initialize Mux client with Video namespace
 const { Video } = new Mux({
     tokenId: process.env.MUX_TOKEN_ID,
     tokenSecret: process.env.MUX_TOKEN_SECRET
@@ -11,6 +11,9 @@ const { Video } = new Mux({
 async function generateVideoLibrary() {
     try {
         console.log('Fetching videos from Mux...');
+        console.log('Token ID:', process.env.MUX_TOKEN_ID ? 'Present' : 'Missing');
+        console.log('Token Secret:', process.env.MUX_TOKEN_SECRET ? 'Present' : 'Missing');
+
         const { data: assets } = await Video.Assets.list({
             limit: 100
         });
@@ -59,4 +62,8 @@ function generateMarkdown(videos) {
     return lines.join('\n');
 }
 
-generateVideoLibrary();
+// Add error handling for the main execution
+generateVideoLibrary().catch(error => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+});
