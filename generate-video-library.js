@@ -223,7 +223,7 @@ function generateMarkdown(videosByCategory) {
          data-created="${video.createdAt}" 
          data-title="${video.title}">
         <mux-player
-            stream-type="vod"
+           stream-type="on-demand"
             playback-id="${video.playbackId}"
             metadata-video-title="${video.title}"
             controls>
