@@ -2,6 +2,24 @@ require('dotenv').config();
 const Mux = require('@mux/mux-node');
 const fs = require('fs');
 
+// Helper functions moved to the top
+function getCategoryColor(category) {
+    const colors = [
+        '#e9d5ff', '#bfdbfe', '#bbf7d0', '#fed7aa', 
+        '#fecaca', '#e9d5ff', '#ddd6fe', '#c7d2fe'
+    ];
+    const index = Math.abs(category.split('').reduce((acc, char) => 
+        acc + char.charCodeAt(0), 0)) % colors.length;
+    return colors[index];
+}
+
+function formatDuration(seconds) {
+    if (!seconds) return 'Unknown';
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
 const muxClient = new Mux.default({
     tokenId: process.env.MUX_TOKEN_ID,
     tokenSecret: process.env.MUX_TOKEN_SECRET
