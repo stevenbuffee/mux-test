@@ -1,4 +1,6 @@
 {
+  "name": "mux-test",
+  "version": "1.0.0",
   "scripts": {
     "generate-library": "node generate-video-library.js"
   },
@@ -6,5 +8,6 @@
     "@mux/mux-node": "^9.0.1",
     "@mux/mux-player": "^3.2.0",
     "dotenv": "^16.4.7"
-  }
+  },
+  "type": "commonjs"
 }
